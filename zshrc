@@ -22,6 +22,8 @@ export ZSH="$HOME/.oh-my-zsh"
 # Set name of the theme to load
 ZSH_THEME="powerlevel10k/powerlevel10k"
 
+ZSH_CUSTOM=$HOME/.oh-my-zsh-custom
+
 # Case-sensitive completion must be off. _ and - will be interchangeable.
 HYPHEN_INSENSITIVE="true"
 
