@@ -46,19 +46,6 @@ handle_file_cp() {
   $CP -R "$1" "$2"
 }
 handle_file_ln() {
-  if [ -e "$2" ]; then
-    printf "%s " "overwrite $2? [yN]"
-    read overwrite
-    case "$overwrite" in
-      y)
-        $RM -rf "$2"
-        ;;
-      *)
-        echo "skipping $2"
-        return
-        ;;
-    esac
-  fi
   verbose "'$1' -> '$2'"
   $MKDIR -p "$($DIRNAME "$2")"
   $LN -sf "$1" "$2"
