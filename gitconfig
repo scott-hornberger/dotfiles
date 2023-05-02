@@ -1,0 +1,41 @@
+[user]
+	name = Scott Hornberger
+	email = sth@uber.com
+[branch]
+	autosetuprebase = always
+[rerere]
+	enabled = true
+[url "ssh://gitolite@code.uber.internal/"]
+	insteadOf = git://code.uber.internal/
+[url "ssh://git@github.com/uber/"]
+	insteadOf = https://github.com/uber/
+[credential "https://git.uberinternal.com"]
+	helper = usso
+[url "ssh://code.uber.internal/"]
+	insteadOf = https://code.uber.internal/
+[url "ssh://config.uber.internal/"]
+	insteadOf = https://config.uber.internal/
+[credential "https://vfs4g-cache.uberinternal.com"]
+	helper = usso
+[http "https://gopkg.uberinternal.com"]
+	followRedirects = true
+[http "https://gopkg.in"]
+	followRedirects = true
+[alias]
+	co = checkout
+         up = !git pull --rebase --prune $@ && git submodule update --init --recursive
+         cm = !git add -A && git commit -m
+         amend = commit -a --amend
+         # wipe adds and commits and hard resets, but you can get this back if you need it with git reflog
+         wipe = !git add -A && git commit -qm 'WIPE SAVEPOINT' && git reset HEAD~1 --hard
+         s = status
+         d = !sh echo hi
+         branches = !git branch --list \"*\" --format \"%(refname)\" | sed -e \"s/refs\\/heads\\///\"
+         edit = !git config --global -e
+         nuke = !git clean -fd :/ && git reset --hard
+[feature]
+	manyfiles = true
+[core]
+	untrackedCache = true
+[init]
+	defaultBranch = main
