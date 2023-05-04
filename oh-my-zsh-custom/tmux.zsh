@@ -1,3 +1,3 @@
-alias tweb='~/.oh-my-zsh/custom/tmux/web-session.sh'
-alias tgo='~/.oh-my-zsh/custom/tmux/go-session.sh'
-alias tpod='~/.oh-my-zsh/custom/tmux/pod-session.sh'
+alias tweb='$ZSH_CUSTOM/tmux/web-session.sh'
+alias tgo='$ZSH_CUSTOM/tmux/go-session.sh'
+alias tpod='$ZSH_CUSTOM/tmux/pod-session.sh'
