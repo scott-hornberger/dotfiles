@@ -5,11 +5,6 @@ if [[ -r "${XDG_CACHE_HOME:-$HOME/.cache}/p10k-instant-prompt-${(%):-%n}.zsh" ]]
   source "${XDG_CACHE_HOME:-$HOME/.cache}/p10k-instant-prompt-${(%):-%n}.zsh"
 fi
 
-# Start tmux
-if command -v tmux &> /dev/null && [ -n "$PS1" ] && [[ ! "$TERM" =~ screen ]] && [[ ! "$TERM" =~ tmux ]] && [ -z "$TMUX" ]; then
-  exec tmux
-fi
-
 # autojump j
 [ -f /usr/local/etc/profile.d/autojump.sh ] && . /usr/local/etc/profile.d/autojump.sh
 
@@ -46,11 +41,6 @@ plugins=(
 )
 autoload -U compinit && compinit
 
-
-# Load pure prompt
-#autoload -U promptinit; promptinit
-#prompt pure
-
 ZSH_AUTOSUGGEST_BUFFER_MAX_SIZE=20
 ZSH_AUTOSUGGEST_USE_ASYNC=true
 bindkey "^[^[[C" forward-word
@@ -69,33 +59,12 @@ eval "$(direnv hook zsh)"
 zstyle ':completion:*' use-cache on
 zstyle ':completion:*' cache-path ~/.zsh/cache
 
-# GOLAND
-alias goland='/usr/local/bin/goland'
-
-# WEBSTORM
-alias webstorm='/usr/local/bin/webstorm'
-
-# EDIT/VIEW ZSHRC
-alias ez='vim ~/.zshrc'
-alias sz='source ~/.zshrc'
-
-# GIT
-alias gs='g s -uno'
-
-
 # set EDITOR to vim
 export VISUAL=vim
 export EDITOR="$VISUAL"
 
 # aurora
 alias aurora-tunnel="ssh -D 8127 -f -C -q -N bastion.uber.com"
-
-# coconut-web
-alias weblint="yarn lint --fix && npx flow"
-export PATH="/usr/local/opt/go@1.16/bin:$PATH"
-export VOLTA_HOME="$HOME/.volta"
-export PATH="$VOLTA_HOME/bin:$PATH"
-
 
 # JDK
 unset JAVA_HOME
@@ -107,13 +76,6 @@ jdk_11 # Use jdk 11 as the default jdk
 
 source $ZSH/oh-my-zsh.sh
 
-alias diffnow="arc diff --use-commit-message HEAD --nointeractive"
-
-# MINECRAFT
-alias ssh-minecraft="ssh opc@129.151.197.212 -i ~/.ssh/ocp_minecraft/ssh-key-2022-09-24.key"
-# On minecraft host, `java -Xmx1024M -Xms1024M -jar server.jar nogui`
-
-
-
 # To customize prompt, run `p10k configure` or edit ~/.p10k.zsh.
 [[ ! -f ~/.p10k.zsh ]] || source ~/.p10k.zsh
+
