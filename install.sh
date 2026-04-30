@@ -1,14 +1,12 @@
 #!/bin/bash
 set -e
 
-# Bootstrap rcm if rcup isn't already on PATH.
-#
-# Most machines won't have rcm packaged (Uber devpods, restricted apt, etc.)
-# so we build it from source into ~/.local. rcm is just Perl/shell scripts —
-# the build needs perl + autoconf + automake + make (all near-universal).
-# We skip the man-page step because that needs python-docutils (rst2man).
+# ============================================================
+# Bootstrap rcm if rcup isn't on PATH (laptop / non-Debian boxes).
+# Devpods get rcm via the apt `rcm` package, so this is a no-op there.
+# ============================================================
 if ! command -v rcup >/dev/null 2>&1; then
-  echo "rcup not found — building rcm 1.3.x from source into ~/.local..."
+  echo "rcup not found — building rcm from source into ~/.local..."
   mkdir -p ~/src ~/.local/bin ~/.local/share/rcm
   if [ ! -d ~/src/rcm ]; then
     git clone --depth=1 https://github.com/thoughtbot/rcm.git ~/src/rcm
@@ -19,22 +17,51 @@ if ! command -v rcup >/dev/null 2>&1; then
   export PATH="$HOME/.local/bin:$PATH"
 fi
 
-# Bootstrap ~/.rcrc — rcup reads this BEFORE doing anything, so if we let
-# rcup manage it as a normal dotfile we hit a chicken-and-egg: rcup wouldn't
-# know about DIRS="claude" on first run and would try to symlink ~/.claude
-# whole, clobbering Claude Code's runtime state. Pre-seed the symlink here
-# so rcup sees the right config from the very first invocation.
+# ============================================================
+# Seed ~/.rcrc BEFORE rcup runs.
+# rcup reads ~/.rcrc to learn DIRS="claude" (recurse into the claude/
+# subdir instead of symlinking ~/.claude whole, which would collide with
+# Claude Code's runtime state). Without this seed, the first rcup -f
+# would either fail or clobber ~/.claude.
+# ============================================================
 if [ ! -e ~/.rcrc ]; then
-  ln -s "$(pwd)/rcrc" ~/.rcrc
+  ln -sfn "$(cd "$(dirname "$0")" && pwd)/rcrc" ~/.rcrc
 fi
 
-# Symlink all dotfiles into $HOME (rcup recurses into dirs listed in ~/.rcrc).
+# ============================================================
+# Symlink everything in ~/.dotfiles into $HOME.
+# ============================================================
 rcup -f
 
-# download and install the required plugins
-ZSH_CUSTOM=~/.oh-my-zsh-custom
+# ============================================================
+# Install oh-my-zsh via its official installer.
+#   --unattended   : skip interactive prompts
+#   --keep-zshrc   : do NOT overwrite our dotfiles-managed ~/.zshrc
+#   CHSH=no        : devpod sets shell: zsh; laptop user owns chsh
+#   RUNZSH=no      : don't drop into a zsh subshell at the end
+# Guarded so it only runs on a fresh box.
+# ============================================================
+if [ ! -d ~/.oh-my-zsh ]; then
+  CHSH=no RUNZSH=no sh -c \
+    "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/HEAD/tools/install.sh)" \
+    "" --unattended --keep-zshrc
+fi
 
-git clone https://github.com/zsh-users/zsh-completions ${ZSH_CUSTOM:-${ZSH:-~/.oh-my-zsh}/custom}/plugins/zsh-completions
-git clone https://github.com/zsh-users/zsh-syntax-highlighting.git ${ZSH_CUSTOM:-~/.oh-my-zsh/custom}/plugins/zsh-syntax-highlighting
-git clone https://github.com/zsh-users/zsh-autosuggestions ${ZSH_CUSTOM:-~/.oh-my-zsh/custom}/plugins/zsh-autosuggestions
-git clone --depth=1 https://github.com/romkatv/powerlevel10k.git ${ZSH_CUSTOM:-$HOME/.oh-my-zsh/custom}/themes/powerlevel10k
+# ============================================================
+# Custom plugins + powerlevel10k theme.
+# IMPORTANT: clone into ~/.oh-my-zsh-custom (NOT ~/.oh-my-zsh/custom) —
+# this matches `ZSH_CUSTOM=$HOME/.oh-my-zsh-custom` set in zshrc.
+# Each clone is guarded so re-runs are no-ops.
+# ============================================================
+ZSH_CUSTOM=~/.oh-my-zsh-custom
+mkdir -p "$ZSH_CUSTOM/plugins" "$ZSH_CUSTOM/themes"
+
+clone_if_missing() {
+  local dest="$1" url="$2"
+  [ -d "$dest" ] || git clone --depth=1 "$url" "$dest"
+}
+
+clone_if_missing "$ZSH_CUSTOM/plugins/zsh-completions"         https://github.com/zsh-users/zsh-completions.git
+clone_if_missing "$ZSH_CUSTOM/plugins/zsh-syntax-highlighting" https://github.com/zsh-users/zsh-syntax-highlighting.git
+clone_if_missing "$ZSH_CUSTOM/plugins/zsh-autosuggestions"     https://github.com/zsh-users/zsh-autosuggestions.git
+clone_if_missing "$ZSH_CUSTOM/themes/powerlevel10k"            https://github.com/romkatv/powerlevel10k.git
