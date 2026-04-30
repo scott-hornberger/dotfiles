@@ -64,17 +64,6 @@ zstyle ':completion:*' cache-path ~/.zsh/cache
 export VISUAL=vim
 export EDITOR="$VISUAL"
 
-# aurora
-alias aurora-tunnel="ssh -D 8127 -f -C -q -N bastion.uber.com"
-
-# JDK
-unset JAVA_HOME
-export JAVA8_HOME="$(/usr/libexec/java_home -v1.8)"
-export JAVA11_HOME="$(/usr/libexec/java_home -v11)"
-alias jdk_11='export JAVA_HOME="$JAVA11_HOME" && export PATH="$JAVA_HOME/bin:$PATH"'
-alias jdk_8='export JAVA_HOME="$JAVA8_HOME" && export PATH="$JAVA_HOME/bin:$PATH"'
-jdk_11 # Use jdk 11 as the default jdk
-
 source $ZSH/oh-my-zsh.sh
 
 alias apub="arh publish --no-interactive"
