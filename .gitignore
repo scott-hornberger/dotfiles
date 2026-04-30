@@ -1,0 +1,7 @@
+# vim swap files (e.g. .CLAUDE.md.swp can otherwise get accidentally added)
+*.swp
+*.swo
+*~
+
+# macOS / editor cruft
+.DS_Store

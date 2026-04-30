@@ -9,7 +9,8 @@ fi
 [ -f /usr/local/etc/profile.d/autojump.sh ] && . /usr/local/etc/profile.d/autojump.sh
 
 # If you come from bash you might have to change your $PATH.
-export PATH=$HOME/bin:/usr/local/bin:$PATH
+# ~/.local/bin holds user-installed tools (e.g. rcm — see ~/.dotfiles/claude/README.md).
+export PATH=$HOME/bin:$HOME/.local/bin:/usr/local/bin:$PATH
 
 # Path to your oh-my-zsh installation.
 export ZSH="$HOME/.oh-my-zsh"
@@ -75,6 +76,10 @@ alias jdk_8='export JAVA_HOME="$JAVA8_HOME" && export PATH="$JAVA_HOME/bin:$PATH
 jdk_11 # Use jdk 11 as the default jdk
 
 source $ZSH/oh-my-zsh.sh
+
+alias apub="arh publish --no-interactive"
+alias claude="CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1 aifx agent run claude --dangerously-skip-permissions --model 'opus[1m]'"
+
 
 # To customize prompt, run `p10k configure` or edit ~/.p10k.zsh.
 [[ ! -f ~/.p10k.zsh ]] || source ~/.p10k.zsh

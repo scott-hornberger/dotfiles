@@ -1,6 +1,7 @@
 [user]
 	name = Scott Hornberger
 	email = sth@uber.com
+	signingkey = 9A:7D:F0:C8:BD:5C:D5:7C:9F:BC:AB:72:5A:49:67:DB:05:B8:F5:3A
 [branch]
 	autosetuprebase = always
 [rerere]

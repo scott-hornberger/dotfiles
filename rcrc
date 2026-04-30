@@ -1,0 +1,20 @@
+# rcm config — controls how `rcup` from ~/.dotfiles is applied to $HOME.
+#
+# DIRS lists directories inside ~/.dotfiles that rcm should RECURSE INTO,
+# symlinking each contained file individually instead of symlinking the
+# whole directory as one unit.
+#
+# Why this matters for `claude/`:
+#   ~/.claude/ holds Claude Code's runtime state (sessions/, projects/,
+#   todos/, history.jsonl, credentials, plugin caches, etc.) that must
+#   stay machine-local and writable. If rcm symlinked the whole ~/.claude
+#   directory to ~/.dotfiles/claude, it would clobber that runtime state.
+#
+# By recursing, only the specific files we drop into ~/.dotfiles/claude/
+# (CLAUDE.md, agents/*.md, skills/*, commands/*, keybindings.json, ...)
+# get symlinked into ~/.claude/, and everything else Claude writes there
+# is left untouched.
+#
+# Add more entries here if other tools have the same "shared config files
+# living next to local runtime state" pattern.
+DIRS="claude"
