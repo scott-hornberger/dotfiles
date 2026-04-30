@@ -56,12 +56,17 @@ fi
 ZSH_CUSTOM=~/.oh-my-zsh-custom
 mkdir -p "$ZSH_CUSTOM/plugins" "$ZSH_CUSTOM/themes"
 
-clone_if_missing() {
+clone_shallow_if_missing() {
   local dest="$1" url="$2"
   [ -d "$dest" ] || git clone --depth=1 "$url" "$dest"
 }
 
-clone_if_missing "$ZSH_CUSTOM/plugins/zsh-completions"         https://github.com/zsh-users/zsh-completions.git
-clone_if_missing "$ZSH_CUSTOM/plugins/zsh-syntax-highlighting" https://github.com/zsh-users/zsh-syntax-highlighting.git
-clone_if_missing "$ZSH_CUSTOM/plugins/zsh-autosuggestions"     https://github.com/zsh-users/zsh-autosuggestions.git
-clone_if_missing "$ZSH_CUSTOM/themes/powerlevel10k"            https://github.com/romkatv/powerlevel10k.git
+clone_shallow_if_missing "$ZSH_CUSTOM/plugins/zsh-completions"         https://github.com/zsh-users/zsh-completions.git
+clone_shallow_if_missing "$ZSH_CUSTOM/plugins/zsh-syntax-highlighting" https://github.com/zsh-users/zsh-syntax-highlighting.git
+clone_shallow_if_missing "$ZSH_CUSTOM/plugins/zsh-autosuggestions"     https://github.com/zsh-users/zsh-autosuggestions.git
+clone_shallow_if_missing "$ZSH_CUSTOM/themes/powerlevel10k"            https://github.com/romkatv/powerlevel10k.git
+
+# NOTE: Uber gitolite repos (~/personal, ~/repos/ubuild, ~/repos/ci) are
+# NOT cloned here — they live in the `clone uber repos` task in
+# ~/devpod.yaml so devpod's ssh-agent context is available. On a laptop,
+# clone them manually after `ussh` setup.
