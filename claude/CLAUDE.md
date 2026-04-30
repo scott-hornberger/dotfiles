@@ -21,8 +21,20 @@ into `~/.dotfiles/claude/`:
 **ALWAYS edit the source path, not the symlink.** When asked to add or modify
 a skill, agent, command, or anything that lives under one of the paths above,
 write to `~/.dotfiles/claude/<...>` — never to `~/.claude/<...>` directly.
-After editing, remind me to `cd ~/.dotfiles && git add … && git commit && git push`
-so it syncs across machines.
+After editing, remind me to:
+
+```
+cd ~/.dotfiles
+git add …
+git commit -m "…"
+git push origin main
+```
+
+**Always use `git push origin main`, never bare `git push`.** Uber devpods
+have a broken `[branch "main"]` block in `/etc/gitconfig` that duplicates
+with the per-repo upstream `git clone` writes, and bare `git push` errors
+out with "multiple upstream branches, refusing to push". The explicit
+`origin main` form skips the upstream lookup and works.
 
 If a target file doesn't exist yet under `~/.dotfiles/claude/` (e.g. first
 skill, first command), create it there and run `rcup -f` to materialize the
