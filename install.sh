@@ -34,6 +34,20 @@ fi
 rcup -f
 
 # ============================================================
+# Flip the dotfiles repo's `origin` from HTTPS to SSH.
+# devpod.yaml has to clone via https://github.com/... because there's
+# no ssh-agent during devpod bootstrap. Once the personal SSH key is
+# in place, pushes should go over SSH (the github.com block in
+# ~/.ssh/config forces the personal key + IdentitiesOnly so they're
+# attributed to scott-hornberger, not the Uber ussh cert).
+# Idempotent: only rewrites if origin is still on HTTPS.
+# ============================================================
+if git -C ~/.dotfiles remote get-url origin 2>/dev/null | grep -q '^https://github.com/'; then
+  git -C ~/.dotfiles remote set-url origin \
+    "$(git -C ~/.dotfiles remote get-url origin | sed -E 's#https://github.com/#git@github.com:#')"
+fi
+
+# ============================================================
 # Install oh-my-zsh via its official installer.
 #   --unattended   : skip interactive prompts
 #   --keep-zshrc   : do NOT overwrite our dotfiles-managed ~/.zshrc
