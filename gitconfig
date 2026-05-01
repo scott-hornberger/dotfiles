@@ -40,3 +40,7 @@
 	untrackedCache = true
 [init]
 	defaultBranch = main
+[gpg]
+	format = x509
+[gpg "x509"]
+	program = /opt/uber/bin/signingfx

@@ -67,7 +67,6 @@ export EDITOR="$VISUAL"
 source $ZSH/oh-my-zsh.sh
 
 alias apub="arh publish --no-interactive"
-alias claude="CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1 aifx agent run claude --dangerously-skip-permissions --model 'opus[1m]'"
 
 
 # To customize prompt, run `p10k configure` or edit ~/.p10k.zsh.
