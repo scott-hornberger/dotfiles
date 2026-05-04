@@ -111,17 +111,18 @@ Go back to step 1 for the next task.
 
 ## PR Tracking loop
 
-After all implementation tasks are complete, track every open PR until merged or approved. For each PR, spawn a watcher sub-agent or check directly:
+After all implementation tasks are complete, track every open PR until merged or approved. For each PR, check status directly using the branch name from the handoff:
 
 ```bash
-gh pr view <number> --json state,reviewDecision \
-  --jq '{state, reviewDecision}'
+arh log -s -f <branch>
 ```
 
-- `state: MERGED` → log `PR_MERGED <task-id> pr=<number>`, done
-- `state: CLOSED` → escalate — PR was closed unexpectedly
-- `reviewDecision: APPROVED` → log `PR_APPROVED <task-id> pr=<number>`, wait for merge
-- `reviewDecision: CHANGES_REQUESTED` → spawn a fix DRONE (see below)
+Read the output and act on the PR state:
+
+- Merged → log `PR_MERGED <task-id> pr=<number>`, done
+- Closed (not merged) → escalate — PR was closed unexpectedly
+- Approved → log `PR_APPROVED <task-id> pr=<number>`, wait for merge
+- Changes requested → spawn a fix DRONE (see below)
 - No decision yet → wait 15 minutes and check again
 
 ### Review Fix
