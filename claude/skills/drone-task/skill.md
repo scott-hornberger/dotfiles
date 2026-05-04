@@ -48,17 +48,15 @@ $USER/<MMYY>/<feature-name>
 
 Example: `sth/0526/add-label-proto`
 
-If the task file specifies a branch name, use that exactly. Otherwise derive one from the task description using the convention above.
-
 ```bash
 cd ~/go-code
 git fetch origin
 git checkout main && git pull
 DATE=$(date +%m%y)
-git checkout -b ${USER}/${DATE}/<feature-name>
+arh feature ${USER}/${DATE}/<feature-name> --parent main
 ```
 
-Use `arh` for all git operations (NOT `gh`).
+Use `arh` for all git and PR operations (NOT `gh`).
 
 ### 4. Implement the change
 
@@ -86,14 +84,20 @@ Write clear commit messages. Do not use `git add -A` (may catch stray files).
 ### 7. Create the PR
 
 ```bash
-arh publish
+arh publish --no-interactive
 ```
 
-PR title format: `<service>: <what this PR does>`  
-PR body should include:
-- What this PR does (1-2 sentences)
-- How to test
-- Part of a stack? List related PRs.
+Structure your commit message so `arh publish` auto-fills the PR template:
+
+```
+<PR title>
+
+Summary:
+<what this PR does — 1-2 sentences>
+
+Test Plan:
+<how it was tested>
+```
 
 ### 8. Write the handoff document
 
