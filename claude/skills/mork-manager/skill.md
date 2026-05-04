@@ -249,3 +249,4 @@ Rewrite this file completely after every event:
 - Always write the handoff event before spawning the next DRONE
 - Keep your terminal informative — it's the DIRECTOR's window into the project
 - When in doubt, escalate rather than guess
+- **Branch naming**: all branches off `main`, named `$USER/<MMYY>/<feature-name>` (e.g. `sth/0526/add-label-proto`). Ensure task instruction files include the correct branch name before spawning a DRONE.

@@ -36,11 +36,26 @@ Do NOT start editing until you understand the code.
 
 ### 3. Create the branch
 
+All branches are cut from `main`. Branch names follow this convention:
+
+```
+$USER/<MMYY>/<feature-name>
+```
+
+- `$USER` — the shell user (e.g. `sth`)
+- `MMYY` — current month + last two digits of year (e.g. `0526` for May 2026)
+- `feature-name` — kebab-case description of what this task does (e.g. `add-label-proto`, `rate-limit-auth`)
+
+Example: `sth/0526/add-label-proto`
+
+If the task file specifies a branch name, use that exactly. Otherwise derive one from the task description using the convention above.
+
 ```bash
 cd ~/go-code
 git fetch origin
 git checkout main && git pull
-git checkout -b <branch-name-from-task>
+DATE=$(date +%m%y)
+git checkout -b ${USER}/${DATE}/<feature-name>
 ```
 
 Use `arh` for all git operations (NOT `gh`).
