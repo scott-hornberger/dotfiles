@@ -33,12 +33,16 @@ Read your `manager-task.md` to understand:
 - The ordered task list (each task has an id, description, instruction file path, dependencies)
 - State directory: `~/mork-state/<project-id>/`
 
-Create the state directory:
+Create the state directory and save all input docs for restart recovery:
 ```bash
-mkdir -p ~/mork-state/<project-id>/handoffs
+mkdir -p ~/mork-state/<project-id>/handoffs ~/mork-state/<project-id>/tasks
+# Save a copy of your own mission file
+cp ~/mork-state/<project-id>/manager-task.md ~/mork-state/<project-id>/manager-task.md 2>/dev/null || true
 ```
 
-Write your first event:
+If `events.log` already exists, you are **restarting** — read it to reconstruct current state (which tasks completed, which PRs exist) before continuing the loop. Do not re-run completed tasks.
+
+Write your first event (skip if restarting and log already has MANAGER_STARTED):
 ```
 <timestamp> MANAGER_STARTED project=<id> tasks=<count>
 ```
@@ -60,6 +64,10 @@ Read the task instruction file:
 cat ~/mork-state/<project-id>/tasks/<task-id>.md
 ```
 
+Before spawning, ensure the task instruction file specifies:
+- The handoff path: `~/mork-state/<project-id>/handoffs/<task-id>.md`
+- The branch name following the `$USER/<MMYY>/<feature-name>` convention
+
 Spawn the DRONE as a sub-agent:
 ```
 Agent(
@@ -77,11 +85,10 @@ Update `status.md`. Then wait — the Agent tool call will return when the DRONE
 
 ### 3. Collect result
 
-The DRONE writes a handoff to `~/go-code/handoff-<task-id>.md` and its result will also appear in the Agent tool output. Read the handoff for structured data:
+The DRONE writes a handoff to `~/mork-state/<project-id>/handoffs/<task-id>.md` (the path is specified in the task instruction file). Read it:
 
 ```bash
-cat ~/go-code/handoff-<task-id>.md
-cp ~/go-code/handoff-<task-id>.md ~/mork-state/<project-id>/handoffs/<task-id>.md
+cat ~/mork-state/<project-id>/handoffs/<task-id>.md
 ```
 
 **If SUCCESS:**

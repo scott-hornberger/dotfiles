@@ -78,7 +78,9 @@ Do not amend — push a new commit so reviewers can see what changed.
 
 ### 6. Write handoff
 
-Write to the path provided in the `handoff=` argument:
+Write to the path provided in the `handoff=` argument — this will be under `~/mork-state/`, never inside `~/go-code/`.
+
+**Never write any files inside `~/go-code/`** — it is a git repo.
 
 ```
 Status: SUCCESS

@@ -97,7 +97,11 @@ PR body should include:
 
 ### 8. Write the handoff document
 
-Create `~/go-code/handoff-<task-id>.md`:
+The task file will specify the exact handoff path — use that path. It will be somewhere under `~/mork-state/`, never inside `~/go-code/`.
+
+If no path is specified, write to `~/mork-state/handoffs/handoff-<task-id>.md`.
+
+**Never write handoff files inside `~/go-code/`** — that directory is a git repo and stray files will show up in `git status`.
 
 ```markdown
 # Handoff: <task-id>
