@@ -251,7 +251,8 @@ Rewrite this file completely after every event:
 
 ## Key rules
 
-- Never spawn two DRONEs for the same task simultaneously
+- **Always sequential**: run exactly one DRONE at a time. Wait for the handoff before launching the next task. Never launch two DRONEs simultaneously, even if tasks appear independent.
+- **No worktrees**: devpods do not have enough disk space for git worktrees. DRONEs must use `git checkout -b` directly in the main working tree. Do not instruct DRONEs to use worktrees and do not mention worktrees in task prompts.
 - Never modify files in `~/go-code` yourself — that is the DRONE's job
 - Always write the handoff event before spawning the next DRONE
 - Keep your terminal informative — it's the DIRECTOR's window into the project
