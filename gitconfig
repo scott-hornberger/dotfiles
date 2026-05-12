@@ -8,8 +8,6 @@
 	enabled = true
 [url "ssh://gitolite@code.uber.internal/"]
 	insteadOf = git://code.uber.internal/
-[url "ssh://git@github.com/uber/"]
-	insteadOf = https://github.com/uber/
 [credential "https://git.uberinternal.com"]
 	helper = usso
 [url "ssh://code.uber.internal/"]
