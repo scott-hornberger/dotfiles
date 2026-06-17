@@ -32,14 +32,137 @@ inline), apply these without asking the user:
   "T3-UPCD-3" (Phabricator display form), but Conduit's
   `uber-jira.issues` field accepts only `UPCD-3` (no `T3-` prefix);
   passing `T3-UPCD-3` returns ERR-CONDUIT-CORE.
-- **Autoland**: NO — user lands manually after reviewing diff +
-  terraform plan.
+- **Autoland tag**: NO — `infra/ci` has no SubmitQueue, so the
+  `autoland` Phab project tag does nothing. Don't bother adding it
+  (confirmed by `arc call-conduit /api/v2/queues` — no `infra-ci`
+  queue exists). Landing happens via `arc land` from this checkout.
 - **Branch name**: descriptive slug per phase, not the JIRA key:
   - Phase 1: `bump-preprod-debian-base-images`
   - Phase 2: `promote-hightier-debian-base-images`
   - Phase 4: `promote-lowtier-debian-base-images`
+- **Auto-land behavior**: YES — once the diff is Accepted AND CI is
+  green, land it yourself with `command arc land`. Do not pause for
+  user confirmation. The user explicitly delegated landing
+  (2026-06-17: "Always land it yourself when it is ready to land").
 
 Only re-ask if the user overrides one in the current session.
+
+## Monitor → Address → Land (post-diff-create workflow)
+
+After `arc diff --create` succeeds, kick off the autonomous landing
+flow. Two pollers run in parallel under the Monitor tool — both are
+zero-LLM-token until something changes.
+
+**FIRST — remind the user to request review from a teammate**, even
+though METADATA auto-assigns reviewers (e.g. `up-cd`, `sjuul` for
+this path). The auto-assigned reviewers may not be available; an
+explicit ping in #ubuild Slack or a direct message to a teammate
+unblocks landing faster. Use `PushNotification`:
+
+```
+PushNotification("D<N> is up — please ping a teammate for review (auto-assigned: up-cd / sjuul)")
+```
+
+Include the diff URL in the user-facing message too.
+
+```
+diff created ─┬─ babysit-diff (CI status)     ─┐
+              └─ comment watcher (reviews)    ─┴─> when BOTH ready ─> arc land
+```
+
+### Pollers to launch
+
+1. **CI**: `Skill("uber-dev:babysit-diff")` with the diff ID. Wakes
+   on `fix_needed`, `green`, or `stuck`.
+2. **Reviewer activity**: a 90s polling loop over
+   `command arc call-conduit transaction.search` with the revision
+   PHID. Emits lines for any new `comment`, `accept`, `reject`,
+   `request-changes`, `close`, `plan-changes`, `resign`, `reopen`.
+
+Get the PHID once at startup:
+```bash
+echo '{"constraints":{"ids":[<NUM>]}}' \
+  | command arc call-conduit differential.revision.search \
+  | python3 -c "import json,sys; print(json.load(sys.stdin)['response']['data'][0]['phid'])"
+```
+
+Then run the watcher under `Monitor(persistent=true)` — see prior
+session for the loop body; key bits: filter transactions by
+`dateCreated > LAST_SEEN_TS`, emit `COMMENT|ts|author|body` or
+`STATUS|ts|author|type`. **Requires `php` on PATH** (`arc call-conduit`
+is a PHP CLI; `brew autoremove` after `brew install uber/alt/ubuild-cli`
+will silently nuke `php@8.x`. Fix: `brew link --overwrite php@8.4`).
+
+### Reacting to events
+
+| Event | Action |
+|-------|--------|
+| `babysit-diff: green` | If status is already Accepted → run land step. Otherwise stop the CI poller and keep waiting for review. |
+| `babysit-diff: fix_needed` | Read pre-extracted errors, fix, commit, `command arc diff` to update D<N>. |
+| `STATUS \| accept` | If CI is green → run land step. Otherwise wait for green. |
+| `STATUS \| reject` / `request-changes` | Read the comment(s), address them per "Addressing comments" below. |
+| `COMMENT \| ...` | Read body. If it's a question → reply via `command arc call-conduit differential.revision.edit` with a `comment` transaction. If it's a change request → treat like `request-changes`. If purely informational → no action. |
+| `STATUS \| close` | Diff abandoned — stop all pollers and report to user. |
+
+### Addressing comments
+
+For each reviewer comment that asks for a change:
+1. Make the code change in the working tree.
+2. Re-run the appropriate Phase Step 1 procedure if the change
+   affects values/YAMLs (so the filter re-runs).
+3. `command arc diff` (with the `arc` shell-function wrapper bypass)
+   to update D<N>. Wrapper amends the commit automatically via
+   `--amend-all --use-commit-message HEAD`.
+4. Post a reply on the diff acknowledging the fix:
+   ```bash
+   echo '{"objectIdentifier":"<PHID>","transactions":[
+     {"type":"comment","value":"Addressed in latest revision: <one-line summary>"}
+   ]}' | command arc call-conduit differential.revision.edit
+   ```
+
+If a comment is ambiguous or asks something only the user can
+decide, post a reply asking, and ping the user with `PushNotification`.
+
+### Landing
+
+When CI is green AND status is Accepted, land:
+
+```bash
+# Refresh master first (someone else may have landed something)
+git fetch origin master
+# Confirm only DEBIAN/BAZEL lines moved on master in our files (cheap sanity)
+git log --name-only --pretty=format: HEAD..origin/master \
+  | grep -E 'values-preprod\.env|ubuild-(multi-arch-)?preprod\.yml' | sort -u
+# Land
+command arc land
+```
+
+Notes:
+- Use `command arc land` (not `arc land`) — the user's `arc` shell
+  wrapper only special-cases `arc diff`, but explicit `command`
+  is consistent and harmless.
+- `arc land` auto-rebases onto the latest master and pushes
+  directly to `origin master`. It runs the IMP vref check via
+  gitolite hooks; expect output like
+  `😈: Controlling D<N> (N file(s) changed, reviewed by: ..., committed by: ...)`.
+- **Do NOT use `arc land --hold && git push <sha>:master`** — the
+  Claude auto-mode classifier blocks raw pushes to `master` as
+  bypassing the review flow, even when `arc land --hold` produced
+  the merge commit. Just run `arc land` directly; it pushes itself.
+- After landing, watch the terraform deploy on
+  https://buildkite.com/uber/terraform/builds/ as usual before
+  smoke-testing (Phase 1 Step 3).
+
+### Safety stops
+
+- If `babysit-diff` reports `fix_needed` more than 3 times for the
+  same root cause, stop and ask the user.
+- If a reviewer leaves a comment that the skill cannot address
+  with a simple code change (e.g. "are you sure?", "let's discuss"),
+  post a reply asking for clarification and ping the user.
+- Never land while CI is RUNNING.
+- Never land before status is Accepted (arc land will refuse with
+  "This revision has not been accepted." — listen to it).
 
 ## References
 
@@ -142,13 +265,19 @@ If other lines moved, investigate before continuing.
 
 ### Step 2 — Land the preprod diff
 
-Use the project's standard PR/diff workflow. The
-`uber-dev:diff-create` and `uber-dev:babysit-diff` skills handle this
-end-to-end. Commit message convention from recent history:
+Hand off to the autonomous flow in **"Monitor → Address → Land"
+(post-diff-create workflow)** above:
 
-```
-release: bump debian base images to <date> builds (preprod)
-```
+1. `Skill("uber-dev:diff-create")` with the Diff defaults
+   (JIRA=`UPCD-3`, autoland skipped, branch=`bump-preprod-debian-base-images`).
+   Commit message: `Bump preprod Debian base images` (matches prior
+   atanwir commits — short, no "release:" prefix).
+2. **Remind the user to request review from a teammate** —
+   `PushNotification` with the diff URL and the auto-assigned
+   reviewers; let them know which person to ping.
+3. Launch CI poller + comment watcher.
+4. React to events per the table; address any reviewer comments.
+5. When CI green AND Accepted → `command arc land`.
 
 After landing, watch https://buildkite.com/uber/terraform/builds/ until
 the terraform apply succeeds.
@@ -192,10 +321,15 @@ should already have been base-image-only from Phase 1).
 
 ### Step 2 — Land the hightier diff
 
-Same PR/diff flow as Phase 1 Step 2. Suggested message:
+Same autonomous flow as Phase 1 Step 2 — diff-create with Diff
+defaults (branch=`promote-hightier-debian-base-images`), remind the
+user to ping a teammate for review, launch the two pollers, address
+comments, `command arc land` when ready.
+
+Suggested commit message:
 
 ```
-release: promote debian base images preprod → hightier
+Promote Debian base images preprod → hightier
 ```
 
 Wait for terraform apply.
@@ -251,10 +385,15 @@ git diff values-lowtier.env ubuild-*.yml
 
 ### Step 2 — Land the lowtier diff
 
-Suggested message:
+Same autonomous flow as Phase 1/2 Step 2 — diff-create with Diff
+defaults (branch=`promote-lowtier-debian-base-images`), remind the
+user to ping a teammate for review, launch the two pollers, address
+comments, `command arc land` when ready.
+
+Suggested commit message:
 
 ```
-release: promote debian base images hightier → lowtier
+Promote Debian base images hightier → lowtier
 ```
 
 Wait for terraform apply.
