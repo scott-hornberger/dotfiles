@@ -22,6 +22,25 @@ point in the rollout and it will figure out where you are and what's next.
 - Always commit and land between phases. Don't bundle preprod +
   hightier + lowtier into one diff.
 
+## Diff defaults (do NOT re-ask)
+
+When handing off to `uber-dev:diff-create` (or doing the equivalent
+inline), apply these without asking the user:
+
+- **JIRA**: `UPCD-3` — long-lived umbrella ticket for routine base
+  image rollouts. Prior commit message bodies render it as
+  "T3-UPCD-3" (Phabricator display form), but Conduit's
+  `uber-jira.issues` field accepts only `UPCD-3` (no `T3-` prefix);
+  passing `T3-UPCD-3` returns ERR-CONDUIT-CORE.
+- **Autoland**: NO — user lands manually after reviewing diff +
+  terraform plan.
+- **Branch name**: descriptive slug per phase, not the JIRA key:
+  - Phase 1: `bump-preprod-debian-base-images`
+  - Phase 2: `promote-hightier-debian-base-images`
+  - Phase 4: `promote-lowtier-debian-base-images`
+
+Only re-ask if the user overrides one in the current session.
+
 ## References
 
 - Project conventions: `CLAUDE.md` (repo root of `infra/ci`)
