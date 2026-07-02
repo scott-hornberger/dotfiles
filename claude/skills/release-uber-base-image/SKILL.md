@@ -74,24 +74,41 @@ diff created ─┬─ babysit-diff (CI status)     ─┐
 
 1. **CI**: `Skill("uber-dev:babysit-diff")` with the diff ID. Wakes
    on `fix_needed`, `green`, or `stuck`.
-2. **Reviewer activity**: a 90s polling loop over
-   `command arc call-conduit transaction.search` with the revision
-   PHID. Emits lines for any new `comment`, `accept`, `reject`,
-   `request-changes`, `close`, `plan-changes`, `resign`, `reopen`.
+2. **Reviewer activity**: run the committed watcher SCRIPT under
+   `Monitor(persistent=true)`. Pass the diff id directly — it resolves
+   the PHID itself:
+   ```
+   Monitor(
+     command="python3 <skill_base_dir>/scripts/watch-reviews.py D<N>",
+     description="reviewer activity on D<N>",
+     persistent=true,
+   )
+   ```
+   `<skill_base_dir>` is the "Base directory for this skill:" path in the
+   skill header (the `~/.claude/...` symlink resolves into `~/.dotfiles`).
+   The script emits one event per line:
+   - `STATUS|<ts>|<name>` on every revision status CHANGE — the one you
+     care about is `... |Accepted`. It also prints a startup heartbeat
+     `STATUS|<ts>|<name> (watcher live)` so you can confirm it's running
+     and see the current status (catches an accept that landed before
+     the watcher started).
+   - `COMMENT|<ts>|<author>|<body>` for each new human comment.
 
-Get the PHID once at startup:
-```bash
-echo '{"constraints":{"ids":[<NUM>]}}' \
-  | command arc call-conduit differential.revision.search \
-  | python3 -c "import json,sys; print(json.load(sys.stdin)['response']['data'][0]['phid'])"
-```
+   **Do NOT re-inline this as a bash+python blob under Monitor.** That
+   was the original "always misses" bug: the Monitor harness wraps the
+   command in an `eval`/shell-snapshot that mangles multi-line inline
+   python, the parse step hits its `except` and silently `exit(0)`s, and
+   the watcher goes dark forever while looking alive in `ps`. The filter
+   logic was provably correct in isolation — the *delivery* was broken.
+   A standalone script file sidesteps eval entirely. The script also (a)
+   detects readiness by status NAME via `differential.revision.search`
+   rather than by guessing transaction `type` strings, and (b) treats a
+   failed poll as a stderr `WATCH-ERR` and keeps going, so one conduit
+   blip can't silence it.
 
-Then run the watcher under `Monitor(persistent=true)` — see prior
-session for the loop body; key bits: filter transactions by
-`dateCreated > LAST_SEEN_TS`, emit `COMMENT|ts|author|body` or
-`STATUS|ts|author|type`. **Requires `php` on PATH** (`arc call-conduit`
-is a PHP CLI; `brew autoremove` after `brew install uber/alt/ubuild-cli`
-will silently nuke `php@8.x`. Fix: `brew link --overwrite php@8.4`).
+   **Requires `php` on PATH** (`arc call-conduit` is a PHP CLI;
+   `brew autoremove` after `brew install uber/alt/ubuild-cli` will
+   silently nuke `php@8.x`. Fix: `brew link --overwrite php@8.4`).
 
 ### Reacting to events
 
@@ -99,10 +116,18 @@ will silently nuke `php@8.x`. Fix: `brew link --overwrite php@8.4`).
 |-------|--------|
 | `babysit-diff: green` | If status is already Accepted → run land step. Otherwise stop the CI poller and keep waiting for review. |
 | `babysit-diff: fix_needed` | Read pre-extracted errors, fix, commit, `command arc diff` to update D<N>. |
-| `STATUS \| accept` | If CI is green → run land step. Otherwise wait for green. |
-| `STATUS \| reject` / `request-changes` | Read the comment(s), address them per "Addressing comments" below. |
-| `COMMENT \| ...` | Read body. If it's a question → reply via `command arc call-conduit differential.revision.edit` with a `comment` transaction. If it's a change request → treat like `request-changes`. If purely informational → no action. |
-| `STATUS \| close` | Diff abandoned — stop all pollers and report to user. |
+| `STATUS \| ... \| Accepted` | If CI is green → run land step. Otherwise wait for green. |
+| `STATUS \| ... \| Needs Revision` / `Changes Planned` | Read the comment(s), address them per "Addressing comments" below. |
+| `COMMENT \| ...` | Read body. If it's a question → reply via `command arc call-conduit differential.revision.edit` with a `comment` transaction. If it's a change request → treat like Needs Revision. If purely informational → no action. |
+| `STATUS \| ... \| Closed` / `Abandoned` | Diff landed or abandoned — stop all pollers and report to user. |
+| `STATUS \| ... \| (watcher live)` | Startup heartbeat — confirms the watcher is up; note the current status, take no other action. |
+
+> The watcher reports the revision **status name** (from
+> `differential.revision.search`), not a transaction `type`. "Accepted"
+> is the land gate; "Needs Revision"/"Changes Planned" mean address
+> comments; "Closed"/"Abandoned" are terminal. `WATCH-ERR` lines go to
+> stderr and are NOT events — if you suspect the watcher is unhealthy,
+> `Read` its Monitor output file to see them.
 
 ### Addressing comments
 
@@ -149,9 +174,41 @@ Notes:
   Claude auto-mode classifier blocks raw pushes to `master` as
   bypassing the review flow, even when `arc land --hold` produced
   the merge commit. Just run `arc land` directly; it pushes itself.
-- After landing, watch the terraform deploy on
-  https://buildkite.com/uber/terraform/builds/ as usual before
-  smoke-testing (Phase 1 Step 3).
+- After landing, ALWAYS auto-launch the terraform-deploy monitor (see
+  "Monitoring the terraform deploy" below) before smoke-testing
+  (Phase 1 Step 3). Never ask whether to monitor — always monitor.
+
+### Monitoring the terraform deploy (ALWAYS, never ask)
+
+After every land, the merge auto-triggers a `uber/terraform` deploy.
+ALWAYS monitor it to completion — do NOT ask the user "want me to
+monitor or pause?". Launch the committed monitor script under
+`Monitor(persistent=true)`, passing the merge commit SHA (from the
+`arc land` output, e.g. `07bcd4788..d90b874f1`):
+
+```
+Monitor(
+  command="python3 <skill_base_dir>/scripts/watch-terraform-deploy.py <merge-sha>",
+  description="terraform deploy for <merge-sha>",
+  persistent=true,
+)
+```
+
+Events: `BUILD|<state>|<num>|<url>` on each state change, then a
+terminal `DONE|passed|...` (proceed to smoke test) or
+`DONE|failed|...` / `DONE|canceled|...` (stop, report, do not promote
+the next tier). It emits on EVERY terminal state, so a failed deploy is
+never silent.
+
+**One-time token setup (credential, not a "monitor?" question).** The
+Buildkite API needs a token. The script reads `BUILDKITE_API_TOKEN`
+from env, else from `~/.config/buildkite/api-token` (bare token or
+`BUILDKITE_API_TOKEN=...`). If that file is missing, the script exits
+with `WATCH-ERR|...|BUILDKITE_API_TOKEN not set`; ask the user ONCE to
+create it (`mkdir -p ~/.config/buildkite && printf '%s' '<token>' >
+~/.config/buildkite/api-token && chmod 600 ~/.config/buildkite/api-token`),
+then relaunch. This is the only thing you may ask about re: deploy
+monitoring — never ask whether to monitor.
 
 ### Safety stops
 
@@ -174,8 +231,35 @@ Notes:
 
 ## Step 0 — Detect current state (ALWAYS run first)
 
+### Step 0a — Get a clean master FIRST (non-negotiable)
+
+ALWAYS sync to a clean `origin/master` before reading any state. The
+rollout state is derived from the values files, and a stale local
+checkout will produce a WRONG state diagnosis — every downstream
+decision (which builds are "latest", whether tiers are equal, what a
+diff would change) is then garbage. A stale local `master` also poisons
+`arc`'s diff base, which can balloon a 3-file diff into a 100+-file one.
+
+```bash
+cd src/terraform/buildkite/pipelines/up-cd
+git fetch origin master
+git checkout master
+git reset --hard origin/master   # local master MUST equal origin/master
+git status --short                # must be empty
+```
+
+Do NOT skip this even if the tree "looks clean" — `git status` clean
+only means no uncommitted edits; it says nothing about how far behind
+`origin/master` your local HEAD is. Confirm `git rev-parse HEAD` ==
+`git rev-parse origin/master` before continuing.
+
+If the working tree has local changes you can't discard, stop and ask
+the user rather than `reset --hard`.
+
+### Step 0b — Detect current state
+
 The rollout state lives entirely in the working tree + git history. Run
-these from `src/terraform/buildkite/pipelines/up-cd/`:
+these from `src/terraform/buildkite/pipelines/up-cd/` (after Step 0a):
 
 ```bash
 cd src/terraform/buildkite/pipelines/up-cd
@@ -279,8 +363,9 @@ Hand off to the autonomous flow in **"Monitor → Address → Land"
 4. React to events per the table; address any reviewer comments.
 5. When CI green AND Accepted → `command arc land`.
 
-After landing, watch https://buildkite.com/uber/terraform/builds/ until
-the terraform apply succeeds.
+After landing, ALWAYS auto-launch the terraform-deploy monitor (see
+"Monitoring the terraform deploy") for the merge SHA and wait for
+`DONE|passed` before the smoke test. Never ask whether to monitor.
 
 ### Step 3 — Smoke test + health verification
 
@@ -331,6 +416,10 @@ Suggested commit message:
 ```
 Promote Debian base images preprod → hightier
 ```
+
+Auto-launch the terraform-deploy monitor (see "Monitoring the terraform
+deploy") for the merge SHA and wait for `DONE|passed`. Never ask whether
+to monitor.
 
 Wait for terraform apply.
 
@@ -395,6 +484,10 @@ Suggested commit message:
 ```
 Promote Debian base images hightier → lowtier
 ```
+
+Auto-launch the terraform-deploy monitor (see "Monitoring the terraform
+deploy") for the merge SHA and wait for `DONE|passed`. Never ask whether
+to monitor.
 
 Wait for terraform apply.
 
